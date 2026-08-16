@@ -78,6 +78,15 @@ export class Orchestrator {
   }
 
   async runTask(taskId: string): Promise<TaskRecord> {
+    const release = await this.store.acquireTaskLock(taskId);
+    try {
+      return await this.runTaskLocked(taskId);
+    } finally {
+      await release();
+    }
+  }
+
+  private async runTaskLocked(taskId: string): Promise<TaskRecord> {
     let task = await this.store.readTask(taskId);
     for (let step = 0; step < this.policy.limits.maxAgentSteps; step += 1) {
       if (task.state === "DONE") return task;
@@ -169,7 +178,18 @@ export class Orchestrator {
         const message = error instanceof Error ? error.message : String(error);
         task.lastError = message;
         await this.store.writeTask(task);
-        await this.blockForProductDecision(task, task.state === "BLOCKED" ? "IMPLEMENTING" : task.state, "orchestrator-error", message);
+        const resumeState = task.state === "BLOCKED" ? "IMPLEMENTING" : task.state;
+        if (/\b401\b|failed to authenticate|oauth access token has expired/i.test(message)) {
+          const request = await this.broker.request(task.id, {
+            kind: "secret_access",
+            resource: "agent-authentication",
+            reason: message,
+            risk: "high"
+          });
+          await this.block(task, resumeState, "Agent authentication requires user action", [request.id]);
+        } else {
+          await this.blockForProductDecision(task, resumeState, "orchestrator-error", message);
+        }
       }
       task = await this.store.readTask(taskId);
     }

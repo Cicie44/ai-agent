@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 
@@ -57,6 +57,53 @@ export class AiStore {
     await this.writeTask(task);
     await this.appendEvent(id, "task.created", { goal });
     return task;
+  }
+
+  async acquireTaskLock(taskId: string): Promise<() => Promise<void>> {
+    const path = join(this.taskDir(taskId), "run.lock");
+    await mkdir(this.taskDir(taskId), { recursive: true });
+    const attempt = async (): Promise<() => Promise<void>> => {
+      try {
+        const handle = await open(path, "wx");
+        await handle.writeFile(`${JSON.stringify({ pid: process.pid, createdAt: now() })}\n`, "utf8");
+        await handle.close();
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        let stale = false;
+        try {
+          const lock = JSON.parse(await readFile(path, "utf8")) as { pid?: number; createdAt?: string };
+          if (typeof lock.pid === "number") {
+            try {
+              process.kill(lock.pid, 0);
+            } catch (probeError) {
+              stale = (probeError as NodeJS.ErrnoException).code === "ESRCH";
+            }
+          }
+          if (lock.createdAt && Date.now() - Date.parse(lock.createdAt) > 4 * 60 * 60 * 1000) stale = true;
+        } catch {
+          stale = true;
+        }
+        if (!stale) throw new Error(`Task ${taskId} is already running`);
+        await unlink(path);
+        return attempt();
+      }
+      return async () => {
+        try {
+          await unlink(path);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+      };
+    };
+    return attempt();
+  }
+
+  async forceUnlockTask(taskId: string): Promise<void> {
+    try {
+      await unlink(join(this.taskDir(taskId), "run.lock"));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
   }
 
   async readTask(taskId: string): Promise<TaskRecord> {

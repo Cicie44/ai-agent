@@ -46,7 +46,7 @@ export class PermissionBroker {
         item.kind === need.kind &&
         item.resource === need.resource &&
         item.exactCommand === need.exactCommand &&
-        item.status !== "denied"
+        item.status === "pending"
     );
     if (duplicate) return duplicate;
     const request: ApprovalRequest = {
@@ -63,7 +63,19 @@ export class PermissionBroker {
 
   async requestAgentNeeds(taskId: string, needs: ApprovalNeed[]): Promise<string[]> {
     const ids: string[] = [];
+    const existing = await this.list();
     for (const need of needs) {
+      const alreadyApproved =
+        need.kind === "command" &&
+        need.exactCommand !== undefined &&
+        existing.some(
+          (item) =>
+            item.taskId === taskId &&
+            item.kind === "command" &&
+            item.exactCommand === need.exactCommand &&
+            item.status === "approved"
+        );
+      if (alreadyApproved) continue;
       const request = await this.request(taskId, need);
       ids.push(request.id);
     }

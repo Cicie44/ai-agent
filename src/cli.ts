@@ -21,6 +21,7 @@ Usage:
   npm run autopilot -- task list
   npm run autopilot -- task show TASK-ID
   npm run autopilot -- task run TASK-ID
+  npm run autopilot -- task unlock TASK-ID
   npm run autopilot -- approvals list
   npm run autopilot -- approvals approve APR-ID
   npm run autopilot -- approvals deny APR-ID`;
@@ -70,6 +71,12 @@ async function main(): Promise<void> {
     const task = await orchestrator.runTask(rest[0]);
     console.log(JSON.stringify(task, null, 2));
     if (task.state === "BLOCKED") process.exitCode = 2;
+    return;
+  }
+  if (group === "task" && action === "unlock") {
+    if (!rest[0]) throw new Error("Task id is required");
+    await store.forceUnlockTask(rest[0]);
+    console.log(`${rest[0]} unlocked`);
     return;
   }
   if (group === "approvals" && action === "list") {

@@ -25,6 +25,7 @@ export function spawnCapture(
       cwd: options.cwd,
       shell: false,
       windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
       env: process.env
     });
     let stdout = "";

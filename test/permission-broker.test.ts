@@ -37,3 +37,15 @@ test("queues and persists commands outside the allow list", async () => {
     assert.equal(second.allowed, true);
   });
 });
+
+test("does not reuse an approved product decision for a new failure", async () => {
+  await withTempWorkspace(async (root) => {
+    const broker = new PermissionBroker(join(root, ".ai"), testPolicy);
+    const first = await broker.requestProductDecision("TASK-TEST", "orchestrator-error", "first failure");
+    await broker.decide(first, "approved");
+    const second = await broker.requestProductDecision("TASK-TEST", "orchestrator-error", "second failure");
+    assert.notEqual(second, first);
+    const approvals = await broker.list();
+    assert.equal(approvals.find((item) => item.id === second)?.status, "pending");
+  });
+});

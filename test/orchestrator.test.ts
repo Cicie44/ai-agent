@@ -45,6 +45,12 @@ class FakePlanner implements PlannerAgent {
   }
 }
 
+class AuthFailingPlanner implements PlannerAgent {
+  async plan(): Promise<never> {
+    throw new Error("API Error: 401 OAuth access token has expired");
+  }
+}
+
 class FakeBuilder implements BuilderAgent {
   calls = 0;
   constructor(private readonly firstReport: ImplementationReport = completed) {}
@@ -135,5 +141,28 @@ test("blocks once, then resumes after a batched approval", async () => {
     const second = await orchestrator.runTask(task.id);
     assert.equal(second.state, "DONE");
     assert.equal(builder.calls, 2);
+  });
+});
+
+test("classifies expired agent authentication as a secret-access gate", async () => {
+  await withTempWorkspace(async (root) => {
+    const store = new AiStore(root);
+    const broker = new PermissionBroker(join(root, ".ai"), testPolicy);
+    const runner = new CommandRunner(broker, testPolicy);
+    const orchestrator = new Orchestrator(
+      store,
+      new AuthFailingPlanner(),
+      new FakeBuilder(),
+      new FakeReviewer(),
+      runner,
+      broker,
+      testPolicy
+    );
+    const task = await store.createTask("auth test");
+    const result = await orchestrator.runTask(task.id);
+    assert.equal(result.state, "BLOCKED");
+    const approvals = await broker.list();
+    assert.equal(approvals.length, 1);
+    assert.equal(approvals[0]!.kind, "secret_access");
   });
 });

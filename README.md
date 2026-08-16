@@ -45,6 +45,8 @@ npm run autopilot -- task run TASK-YYYYMMDD-XXXXXX
 
 The second `task run` resumes the same Codex and Claude sessions after all requests in the batch are approved.
 
+Only one process may run a task at a time. If a host crash leaves a stale lock that cannot be detected automatically, clear that exact task lock with `npm run autopilot -- task unlock TASK-ID` after confirming no run is active.
+
 ## State machine
 
 ```text

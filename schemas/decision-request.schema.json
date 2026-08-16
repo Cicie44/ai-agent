@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "resource", "reason", "risk", "taskId", "status", "createdAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "kind": { "enum": ["command", "network", "external_write", "secret_access", "destructive", "filesystem", "product_decision"] },
+    "resource": { "type": "string" },
+    "reason": { "type": "string" },
+    "risk": { "enum": ["low", "medium", "high"] },
+    "taskId": { "type": "string" },
+    "exactCommand": { "type": "string" },
+    "status": { "enum": ["pending", "approved", "denied"] },
+    "createdAt": { "type": "string" },
+    "decidedAt": { "type": "string" }
+  }
+}

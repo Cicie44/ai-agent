@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "summary", "filesChanged", "commandsRun", "tests", "needsApproval", "unresolved"],
+  "properties": {
+    "status": { "enum": ["completed", "blocked"] },
+    "summary": { "type": "string" },
+    "filesChanged": { "type": "array", "items": { "type": "string" } },
+    "commandsRun": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "outcome"],
+        "properties": {
+          "command": { "type": "string" },
+          "outcome": { "type": "string" }
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "details"],
+        "properties": {
+          "name": { "type": "string" },
+          "status": { "enum": ["passed", "failed", "not-run"] },
+          "details": { "type": "string" }
+        }
+      }
+    },
+    "needsApproval": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "resource", "reason", "risk"],
+        "properties": {
+          "kind": { "enum": ["command", "network", "external_write", "secret_access", "destructive", "filesystem"] },
+          "resource": { "type": "string" },
+          "reason": { "type": "string" },
+          "risk": { "enum": ["low", "medium", "high"] },
+          "exactCommand": { "type": "string" }
+        }
+      }
+    },
+    "unresolved": { "type": "array", "items": { "type": "string" } }
+  }
+}

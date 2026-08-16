@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.worktrees/
+
+# Runtime state. Policy and project configuration stay tracked.
+.ai/approvals.json
+.ai/events.ndjson
+.ai/tasks/*
+!.ai/tasks/.gitkeep
+
+# Local secrets and environment overrides.
+.env
+.env.*
+!.env.example
+*.log

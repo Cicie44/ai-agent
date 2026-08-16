@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "skill-factory",
+  "workspaceMode": "root",
+  "agents": {
+    "planner": {
+      "provider": "codex",
+      "model": null
+    },
+    "builder": {
+      "provider": "claude-code",
+      "model": null,
+      "effort": "high"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": null
+    }
+  }
+}

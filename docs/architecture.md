@@ -1,0 +1,28 @@
+# Architecture
+
+## Components
+
+1. `Orchestrator` is the only component that advances task state. It is deterministic and bounded by step and repair limits.
+2. `CodexAgentAdapter` supplies a read-only planner and an independent reviewer through the Codex SDK.
+3. `ClaudeCodeAdapter` runs Claude Code non-interactively and validates its structured implementation report.
+4. `CommandRunner` executes argument arrays directly, never interpolated shell strings.
+5. `PermissionBroker` converts capabilities outside the allow list into persistent, batchable approval requests.
+6. `AiStore` persists task artifacts and an append-only event stream so a run can resume after interruption.
+
+## Trust boundaries
+
+- The repository root is the default writable boundary.
+- The task specification narrows intended writes with `allowedPaths`.
+- Model output never directly changes task state; it is parsed and validated first.
+- The builder cannot approve its own work.
+- A deterministic validation failure always creates a repair cycle.
+- External side effects are not part of phase one.
+
+## Planned extensions
+
+- `WorkspaceManager` for one Git worktree and branch per task
+- browser/computer-use QA adapter
+- scoped grants with expiration and run/project lifetimes
+- release adapter for local commits and approval-gated PRs
+- dashboard backed by the existing `.ai` protocol
+- agent traces, cost accounting, and regression evals

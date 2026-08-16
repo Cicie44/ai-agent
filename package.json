@@ -1,0 +1,24 @@
+{
+  "name": "ai-dev-orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A deterministic local orchestrator for Codex planning/review and Claude Code implementation.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "autopilot": "npm run build --silent && node dist/src/cli.js",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build --silent && node dist/test/all.test.js",
+    "sync:contracts": "node scripts/sync-agent-contract.mjs"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "0.147.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "typescript": "7.0.2"
+  }
+}

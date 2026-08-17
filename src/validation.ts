@@ -22,15 +22,29 @@ function requireObject(value: unknown, label: string): Record<string, unknown> {
 
 export function parseJsonPayload(raw: string): unknown {
   const trimmed = raw.trim();
-  try {
-    return JSON.parse(trimmed) as unknown;
-  } catch {
-    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-    if (!fenced?.[1]) {
-      throw new Error("Agent response was not valid JSON");
-    }
-    return JSON.parse(fenced[1]) as unknown;
+  const candidates = [trimmed];
+
+  // A complete fenced payload must win over object-shaped lines nested inside it.
+  const fences = [...trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)\s*```/gi)];
+  for (const fence of fences.reverse()) {
+    if (fence[1]) candidates.push(fence[1].trim());
   }
+
+  // Some agent CLIs or shell profiles write a notice before their JSON result.
+  const lines = trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    candidates.push(...lines.reverse().filter((line) => line.startsWith("{") || line.startsWith("[")));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as unknown;
+    } catch {
+      // Try the next representation.
+    }
+  }
+
+  throw new Error("Agent response was not valid JSON");
 }
 
 export function validateTaskSpec(value: unknown, expectedId: string): TaskSpec {

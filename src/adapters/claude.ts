@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import type {
   AgentResult,
@@ -24,7 +26,11 @@ function extractStructuredOutput(stdout: string): { value: unknown; sessionId?: 
   if (record.is_error === true) {
     throw new Error(`Claude Code failed: ${String(record.result ?? "unknown error")}`);
   }
-  const candidate = record.structured_output ?? record.structuredOutput ?? record.result ?? record;
+  const structuredOutput = record.structured_output ?? record.structuredOutput;
+  const candidate = structuredOutput ?? record.result ?? record;
+  if (record.type === "result" && structuredOutput === undefined && (record.result === "" || record.result === null)) {
+    throw new Error(`Claude Code returned no structured output (subtype: ${String(record.subtype ?? "unknown")})`);
+  }
   const value = typeof candidate === "string" ? parseJsonPayload(candidate) : candidate;
   const sessionId = typeof record.session_id === "string" ? record.session_id : undefined;
   return { value, ...(sessionId ? { sessionId } : {}) };
@@ -81,6 +87,20 @@ export class ClaudeCodeAdapter implements BuilderAgent {
       timeoutMs: this.policy.limits.maxCommandMs,
       maxOutputChars: this.policy.limits.maxOutputChars
     });
+    const auditDir = join(task.workspacePath, ".ai", "tasks", task.id);
+    await mkdir(auditDir, { recursive: true });
+    await writeFile(
+      join(auditDir, "builder-last-output.json"),
+      `${JSON.stringify({
+        capturedAt: new Date().toISOString(),
+        exitCode: result.exitCode,
+        timedOut: result.timedOut,
+        durationMs: result.durationMs,
+        stdout: result.stdout,
+        stderr: result.stderr
+      }, null, 2)}\n`,
+      "utf8"
+    );
     if (result.exitCode !== 0) {
       throw new Error(`Claude Code exited with ${result.exitCode}: ${result.stderr || result.stdout}`);
     }

@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 export interface SpawnResult {
   exitCode: number | null;
@@ -8,10 +10,22 @@ export interface SpawnResult {
   timedOut: boolean;
 }
 
-function executableForPlatform(executable: string): string {
-  if (process.platform !== "win32") return executable;
-  if (["npm", "npx", "pnpm", "yarn"].includes(executable.toLowerCase())) return `${executable}.cmd`;
-  return executable;
+export function resolveSpawnCommand(executable: string, args: string[]): { executable: string; args: string[] } {
+  if (process.platform !== "win32") return { executable, args };
+
+  const command = executable.toLowerCase();
+  if (command === "npm" || command === "npx") {
+    const cli = join(
+      dirname(process.execPath),
+      "node_modules",
+      "npm",
+      "bin",
+      command === "npm" ? "npm-cli.js" : "npx-cli.js"
+    );
+    if (existsSync(cli)) return { executable: process.execPath, args: [cli, ...args] };
+  }
+
+  return { executable, args };
 }
 
 export function spawnCapture(
@@ -21,7 +35,8 @@ export function spawnCapture(
 ): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
-    const child = spawn(executableForPlatform(executable), args, {
+    const resolved = resolveSpawnCommand(executable, args);
+    const child = spawn(resolved.executable, resolved.args, {
       cwd: options.cwd,
       shell: false,
       windowsHide: true,

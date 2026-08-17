@@ -8,6 +8,7 @@ import { loadPolicyConfig, loadProjectConfig } from "./config.js";
 import { runDoctor } from "./doctor.js";
 import { Orchestrator } from "./orchestrator.js";
 import { PermissionBroker } from "./permission-broker.js";
+import { createSkill, validateSkillDir } from "./skill-factory/index.js";
 import { AiStore } from "./store.js";
 
 const root = resolve(process.cwd());
@@ -24,13 +25,73 @@ Usage:
   npm run autopilot -- task unlock TASK-ID
   npm run autopilot -- approvals list
   npm run autopilot -- approvals approve APR-ID
-  npm run autopilot -- approvals deny APR-ID`;
+  npm run autopilot -- approvals deny APR-ID
+  npm run autopilot -- skill create "brief" [--name skill-name] [--out path]
+  npm run autopilot -- skill validate <path>`;
+}
+
+function parseFlags(args: string[]): { flags: Record<string, string>; positional: string[] } {
+  const flags: Record<string, string> = {};
+  const positional: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) continue;
+    if (arg.startsWith("--")) {
+      const key = arg.slice(2);
+      const next = args[i + 1];
+      if (next !== undefined && !next.startsWith("--")) {
+        flags[key] = next;
+        i++;
+      } else {
+        flags[key] = "true";
+      }
+    } else {
+      positional.push(arg);
+    }
+  }
+  return { flags, positional };
 }
 
 async function main(): Promise<void> {
   const [group, action, ...rest] = process.argv.slice(2);
   if (!group || group === "help" || group === "--help") {
     console.log(usage());
+    return;
+  }
+  if (group === "skill" && action === "create") {
+    const { flags, positional } = parseFlags(rest);
+    const brief = positional.join(" ").trim();
+    if (!brief) throw new Error("Brief is required: npm run autopilot -- skill create \"brief\"");
+    const skillOptions: import("./skill-factory/index.js").CreateOptions = {};
+    const flagName = flags["name"];
+    const flagOut = flags["out"];
+    if (flagName !== undefined) skillOptions.name = flagName;
+    if (flagOut !== undefined) skillOptions.out = flagOut;
+    const result = await createSkill(root, brief, skillOptions);
+    if (!result.validation.ok) {
+      console.error("Skill package created but failed validation:");
+      for (const d of result.validation.diagnostics) {
+        console.error(`  [${d.field}] ${d.message}`);
+      }
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`Created skill package: ${result.outDir}`);
+    return;
+  }
+  if (group === "skill" && action === "validate") {
+    const dir = rest[0];
+    if (!dir) throw new Error("Path is required: npm run autopilot -- skill validate <path>");
+    const result = await validateSkillDir(resolve(dir));
+    if (result.ok) {
+      console.log("Skill package is valid.");
+      return;
+    }
+    console.error("Skill package is invalid:");
+    for (const d of result.diagnostics) {
+      console.error(`  [${d.field}] ${d.message}`);
+    }
+    process.exitCode = 1;
     return;
   }
   const store = new AiStore(root);

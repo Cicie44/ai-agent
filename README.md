@@ -101,6 +101,109 @@ Runtime artifacts and approval decisions are ignored by Git. Project policy, sch
 - External writes, secrets, destructive operations, production changes, and network expansion are never auto-approved by the default policy.
 - `--dangerously-skip-permissions` is intentionally not used.
 
+## Skill Factory
+
+The Skill Factory converts a natural-language workflow brief into a validated, portable skill package — entirely offline, using only local code and Node.js built-ins. No credentials, network calls, or external services are required.
+
+### Create a skill
+
+```powershell
+npm run autopilot -- skill create "Summarize a document into three bullet points"
+```
+
+By default the skill name is derived from the brief (lowercase, hyphenated) and the package is written to `skills/<name>/`. Both can be overridden:
+
+```powershell
+npm run autopilot -- skill create "brief" --name my-skill-name
+npm run autopilot -- skill create "brief" --out ./custom/output/path
+```
+
+### Validate an existing skill package
+
+```powershell
+npm run autopilot -- skill validate ./skills/my-skill-name
+```
+
+### Generated directory layout
+
+```
+skills/<name>/
+  SKILL.md            — YAML frontmatter (name, description) + workflow instructions
+  evals/
+    evals.json        — skill_name + array of at least two eval cases
+```
+
+**SKILL.md** structure:
+
+```markdown
+---
+name: my-skill-name
+description: "What the skill does"
+---
+
+## Instructions
+
+<brief text preserved verbatim>
+
+## Steps
+
+1. Analyze the provided request or input.
+2. Execute the workflow described in the instructions.
+3. Return a clear, complete result.
+```
+
+**evals/evals.json** structure:
+
+```json
+{
+  "skill_name": "my-skill-name",
+  "evals": [
+    {
+      "id": "my-skill-name-eval-001",
+      "prompt": "Demonstrate the core workflow: ...",
+      "expected_output": "...",
+      "files": []
+    },
+    {
+      "id": "my-skill-name-eval-002",
+      "prompt": "Edge case: ...",
+      "expected_output": "...",
+      "files": []
+    }
+  ]
+}
+```
+
+### Validation behavior
+
+The validator (run automatically after creation and available as a standalone command) detects:
+
+- Missing `SKILL.md` or `evals/evals.json`
+- Malformed YAML frontmatter (missing `---` delimiters)
+- Invalid skill name (must be `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
+- Empty `description` or empty instruction body
+- Mismatched `skill_name` between the two files
+- Fewer than two eval cases
+- Eval cases with empty `id`, `prompt`, or `expected_output`
+- Duplicate eval case identifiers
+- Unsafe file references in `files` arrays (absolute paths or `..` traversal)
+
+A non-zero exit status is returned when any diagnostic is found.
+
+### Safeguards
+
+**Workspace boundary** — the `--out` path must resolve to a location inside the current working directory. Paths using `..` or absolute paths pointing outside the workspace are rejected.
+
+**Overwrite protection** — creation is refused if the destination directory already exists and contains files. Choose a different `--name` or `--out` to avoid collisions.
+
+**Skill name rules** — names must start with a lowercase letter, contain only lowercase ASCII letters, digits, and hyphens, with no consecutive or trailing hyphens.
+
+### MVP limitations
+
+- Generation uses a deterministic local template. The brief is preserved verbatim in the instructions section; no model is called.
+- Generated eval prompts and expected outputs are scaffolded stubs. Edit `evals/evals.json` to add domain-specific cases.
+- The factory does not execute skills, score evals, install packages into any runtime, or publish to any registry.
+
 ## Next milestone
 
 Use this loop to build the Skill Factory itself, then add browser QA, isolated per-task worktrees, a compact approval dashboard, GitHub PR automation, and cost/success metrics.

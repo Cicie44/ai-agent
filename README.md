@@ -103,7 +103,7 @@ Runtime artifacts and approval decisions are ignored by Git. Project policy, sch
 
 ## Skill Factory
 
-The Skill Factory converts a natural-language workflow brief into a validated, portable skill package — entirely offline, using only local code and Node.js built-ins. No credentials, network calls, or external services are required.
+The Skill Factory converts a natural-language workflow brief into a validated, portable skill package. The default provider is deterministic and entirely offline; an explicit Claude Code provider adds AI-assisted authoring with a bounded repair loop and an automatic offline fallback.
 
 ### Create a skill
 
@@ -118,11 +118,27 @@ npm run autopilot -- skill create "brief" --name my-skill-name
 npm run autopilot -- skill create "brief" --out ./custom/output/path
 ```
 
+AI-assisted authoring is opt-in:
+
+```powershell
+npm run autopilot -- skill create "Build a release-note workflow" --provider claude-code
+```
+
+The Claude provider runs non-interactively with a JSON Schema response and no filesystem or shell tools. Every candidate is validated and scored, with at most two repair rounds. If Claude fails or exhausts repairs, one deterministic offline fallback is attempted. Automated tests never invoke Claude or the network.
+
 ### Validate an existing skill package
 
 ```powershell
 npm run autopilot -- skill validate ./skills/my-skill-name
 ```
+
+### Preview installation
+
+```powershell
+npm run autopilot -- skill install-plan ./skills/my-skill-name --target all
+```
+
+Targets are `codex`, `claude-code`, or `all`. This command is a strict dry run: it validates the package and prints deterministic JSON copy operations using symbolic destinations such as `$CODEX_HOME/skills`. It never probes, creates, or writes to user-level installation directories.
 
 ### Generated directory layout
 
@@ -131,6 +147,7 @@ skills/<name>/
   SKILL.md            — YAML frontmatter (name, description) + workflow instructions
   evals/
     evals.json        — skill_name + array of at least two eval cases
+    quality-report.json — provider attempts, checks, score, threshold, and final status
 ```
 
 **SKILL.md** structure:
@@ -190,9 +207,20 @@ The validator (run automatically after creation and available as a standalone co
 
 A non-zero exit status is returned when any diagnostic is found.
 
+### Quality and repair loop
+
+Each creation is scored from 0 to 100 using a deterministic rubric:
+
+- 50 points: the package passes structural validation
+- 20 points: instructions are substantive and contain actionable steps
+- 20 points: at least two complete eval cases are present
+- 10 points: eval file references are portable
+
+The default pass threshold is 80, and structural validation must pass regardless of score. The versioned report at `evals/quality-report.json` records the requested and effective providers, bounded attempt summaries, checks, diagnostics, fallback reason, score, and threshold. It deliberately excludes prompts, provider stdout/stderr, environment variables, and authentication material.
+
 ### Safeguards
 
-**Workspace boundary** — the `--out` path must resolve to a location inside the current working directory. Paths using `..` or absolute paths pointing outside the workspace are rejected.
+**Workspace boundary** — the `--out` path must resolve to a location inside the current working directory. Paths using `..`, absolute paths pointing outside the workspace, and symlink or junction escapes are rejected.
 
 **Overwrite protection** — creation is refused if the destination directory already exists and contains files. Choose a different `--name` or `--out` to avoid collisions.
 
@@ -200,9 +228,10 @@ A non-zero exit status is returned when any diagnostic is found.
 
 ### MVP limitations
 
-- Generation uses a deterministic local template. The brief is preserved verbatim in the instructions section; no model is called.
+- Generation uses a deterministic local template unless `--provider claude-code` is selected explicitly.
 - Generated eval prompts and expected outputs are scaffolded stubs. Edit `evals/evals.json` to add domain-specific cases.
-- The factory does not execute skills, score evals, install packages into any runtime, or publish to any registry.
+- Quality scoring is static; the factory does not execute skills or model-judge semantic outputs.
+- Installation is planning-only. The factory does not copy into a runtime or publish to a registry.
 
 ## Next milestone
 

@@ -8,7 +8,13 @@ import { loadPolicyConfig, loadProjectConfig } from "./config.js";
 import { runDoctor } from "./doctor.js";
 import { Orchestrator } from "./orchestrator.js";
 import { PermissionBroker } from "./permission-broker.js";
-import { createSkill, validateSkillDir } from "./skill-factory/index.js";
+import {
+  createInstallPlan,
+  createSkill,
+  parseInstallTarget,
+  parseSkillProvider,
+  validateSkillDir
+} from "./skill-factory/index.js";
 import { AiStore } from "./store.js";
 
 const root = resolve(process.cwd());
@@ -26,8 +32,9 @@ Usage:
   npm run autopilot -- approvals list
   npm run autopilot -- approvals approve APR-ID
   npm run autopilot -- approvals deny APR-ID
-  npm run autopilot -- skill create "brief" [--name skill-name] [--out path]
-  npm run autopilot -- skill validate <path>`;
+  npm run autopilot -- skill create "brief" [--name skill-name] [--out path] [--provider offline|claude-code]
+  npm run autopilot -- skill validate <path>
+  npm run autopilot -- skill install-plan <path> [--target codex|claude-code|all]`;
 }
 
 function parseFlags(args: string[]): { flags: Record<string, string>; positional: string[] } {
@@ -65,18 +72,23 @@ async function main(): Promise<void> {
     const skillOptions: import("./skill-factory/index.js").CreateOptions = {};
     const flagName = flags["name"];
     const flagOut = flags["out"];
+    const flagProvider = flags["provider"];
     if (flagName !== undefined) skillOptions.name = flagName;
     if (flagOut !== undefined) skillOptions.out = flagOut;
+    const provider = parseSkillProvider(flagProvider);
+    if (provider !== undefined) skillOptions.provider = provider;
     const result = await createSkill(root, brief, skillOptions);
-    if (!result.validation.ok) {
-      console.error("Skill package created but failed validation:");
-      for (const d of result.validation.diagnostics) {
+    if (!result.validation.ok || !result.qualityReport.passed) {
+      console.error("Skill package did not pass its quality gate:");
+      for (const d of result.qualityReport.diagnostics) {
         console.error(`  [${d.field}] ${d.message}`);
       }
+      console.error(`Quality score: ${result.qualityReport.score}/${result.qualityReport.threshold}`);
       process.exitCode = 1;
       return;
     }
     console.log(`Created skill package: ${result.outDir}`);
+    console.log(`Quality score: ${result.qualityReport.score}/${result.qualityReport.threshold}`);
     return;
   }
   if (group === "skill" && action === "validate") {
@@ -92,6 +104,16 @@ async function main(): Promise<void> {
       console.error(`  [${d.field}] ${d.message}`);
     }
     process.exitCode = 1;
+    return;
+  }
+  if (group === "skill" && action === "install-plan") {
+    const { flags, positional } = parseFlags(rest);
+    if (positional.length !== 1) {
+      throw new Error("Exactly one package path is required: npm run autopilot -- skill install-plan <path>");
+    }
+    const selectedTarget = parseInstallTarget(flags["target"]);
+    const plan = await createInstallPlan(root, positional[0]!, selectedTarget);
+    console.log(JSON.stringify(plan, null, 2));
     return;
   }
   const store = new AiStore(root);

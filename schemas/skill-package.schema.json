@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["skillMd", "evals"],
+  "properties": {
+    "skillMd": { "type": "string", "minLength": 1 },
+    "evals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill_name", "evals"],
+      "properties": {
+        "skill_name": { "type": "string", "minLength": 1 },
+        "evals": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "prompt", "expected_output", "files"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "prompt": { "type": "string", "minLength": 1 },
+              "expected_output": { "type": "string", "minLength": 1 },
+              "files": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

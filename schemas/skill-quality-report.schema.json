@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "requestedProvider",
+    "effectiveProvider",
+    "providersAttempted",
+    "attempts",
+    "checks",
+    "score",
+    "threshold",
+    "passed",
+    "diagnostics",
+    "fallbackReason"
+  ],
+  "$defs": {
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "message"],
+      "properties": {
+        "field": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  },
+  "properties": {
+    "version": { "const": 1 },
+    "requestedProvider": { "enum": ["offline", "claude-code"] },
+    "effectiveProvider": { "enum": ["offline", "claude-code"] },
+    "providersAttempted": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["offline", "claude-code"] }
+    },
+    "attempts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt", "provider", "phase", "outcome", "score", "diagnostics"],
+        "properties": {
+          "attempt": { "type": "integer", "minimum": 1 },
+          "provider": { "enum": ["offline", "claude-code"] },
+          "phase": { "enum": ["initial", "repair", "fallback"] },
+          "outcome": { "enum": ["passed", "failed", "error"] },
+          "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "weight", "earned", "passed", "details"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "weight": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "earned": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "passed": { "type": "boolean" },
+          "details": { "type": "string" }
+        }
+      }
+    },
+    "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "threshold": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "passed": { "type": "boolean" },
+    "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } },
+    "fallbackReason": { "type": ["string", "null"] }
+  }
+}

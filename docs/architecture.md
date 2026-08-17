@@ -18,6 +18,16 @@
 - A deterministic validation failure always creates a repair cycle.
 - External side effects are not part of phase one.
 
+## Skill Factory v0.2
+
+Skill authoring is separated from package writes by the `SkillAuthoringProvider` interface. Providers receive only the brief, derived metadata, attempt number, and structured diagnostics; they return an untrusted candidate object and never receive filesystem tools. `OfflineSkillProvider` is the default. `ClaudeCodeSkillProvider` is opt-in, runs with argument arrays and `shell: false`, requests JSON Schema output, disables tools, bounds time and output, and exposes only classified errors.
+
+`createSkill` is the sole package writer. It canonicalizes the workspace and destination, rejects symlink and junction escapes, validates every candidate, and permits an initial attempt plus two repairs. Claude failures or exhausted repairs receive one offline fallback attempt. The final `evals/quality-report.json` is deterministic and contains no prompt, raw provider output, environment, or authentication data.
+
+Quality scoring is a static 100-point gate covering package validity, substantive instructions, eval coverage, and portable file references. A score of 80 is required, and structurally invalid packages can never pass.
+
+`skill install-plan` is read-only. It canonicalizes and validates a workspace-local source, rejects links and non-regular files, and produces symbolic copy destinations for Codex and Claude Code. Actual installation remains an explicit external-write gate.
+
 ## Planned extensions
 
 - `WorkspaceManager` for one Git worktree and branch per task

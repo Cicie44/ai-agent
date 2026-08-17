@@ -101,6 +101,9 @@ export class ClaudeCodeAdapter implements BuilderAgent {
       }, null, 2)}\n`,
       "utf8"
     );
+    if (result.timedOut) {
+      throw new Error(`Claude Code timed out after ${result.durationMs}ms`);
+    }
     if (result.exitCode !== 0) {
       throw new Error(`Claude Code exited with ${result.exitCode}: ${result.stderr || result.stdout}`);
     }
